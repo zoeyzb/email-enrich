@@ -1,0 +1,51 @@
+{
+  "name": "email-enrich",
+  "version": "0.1.0",
+  "description": "Zero-API-key email enrichment: find and verify professional email addresses by harvesting public company pages, inferring naming patterns, and probing SMTP — with a name-affinity guard against wrong-person matches.",
+  "keywords": [
+    "email",
+    "enrichment",
+    "email-finder",
+    "email-verification",
+    "smtp",
+    "lead-generation",
+    "outreach",
+    "web-scraping"
+  ],
+  "license": "MIT",
+  "author": "waterdoog",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/waterdoog/email-enrich.git"
+  },
+  "bugs": {
+    "url": "https://github.com/waterdoog/email-enrich/issues"
+  },
+  "homepage": "https://github.com/waterdoog/email-enrich#readme",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "cheerio": "^1.2.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.14",
+    "@types/node": "^22.10.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.4.6",
+    "typescript": "^5.9.3"
+  }
+}
