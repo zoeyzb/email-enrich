@@ -304,14 +304,16 @@ export async function harvestPublicEmails(input: { domain: string; mode: EnrichM
       }
     }
 
-    const secondWaveTargets = Array.from(discovered)
-      .filter((url) => !contentByUrl.has(url))
-      .slice(0, remainingCapacity(contentByUrl.size));
-    await runWithConcurrency(secondWaveTargets, 4, async (url) => {
-      const fetched = await fetchText(url);
-      contentByUrl.set(url, { content: fetched.content, contentType: fetched.contentType });
-      return true;
-    });
+    if (input.mode !== "fast") {
+      const secondWaveTargets = Array.from(discovered)
+        .filter((url) => !contentByUrl.has(url))
+        .slice(0, remainingCapacity(contentByUrl.size));
+      await runWithConcurrency(secondWaveTargets, 4, async (url) => {
+        const fetched = await fetchText(url);
+        contentByUrl.set(url, { content: fetched.content, contentType: fetched.contentType });
+        return true;
+      });
+    }
 
     if (input.mode !== "fast" && remainingCapacity(contentByUrl.size) > 0) {
       const discoveredLevel3 = new Set<string>();
