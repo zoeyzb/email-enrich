@@ -35,13 +35,11 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "typecheck": "tsc --noEmit",
-    "prepublishOnly": "npm run build",
-    "mcp": "node mcp/server.mjs"
+    "prepublishOnly": "npm run build"
   },
   "dependencies": {
     "cheerio": "^1.2.0",
-    "zod": "^3.25.76",
-    "@modelcontextprotocol/sdk": "^1.18.0"
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@types/jest": "^29.5.14",
