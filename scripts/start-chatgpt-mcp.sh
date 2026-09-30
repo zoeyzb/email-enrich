@@ -5,6 +5,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
 npm install
+npm install --no-save @modelcontextprotocol/sdk
 npm run build
 
 echo "Email Enrich MCP: http://127.0.0.1:8766/mcp"
