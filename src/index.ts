@@ -143,17 +143,12 @@ function mergeRealCandidates(domain: string, name: ParsedName, ...emailLists: st
 function sourceHintCandidates(emails: string[], name: ParsedName) {
   const unique = Array.from(new Set(emails.map((email) => email.toLowerCase()).filter(Boolean)));
   return unique
-    .map((email) => {
-      const nameMatched = hasNameAffinity(email, name);
-      const confidence = nameMatched ? 0.98 : unique.length <= 3 ? 0.9 : 0.75;
-      return {
-        email,
-        confidence,
-        reason: nameMatched
-          ? "Found directly on provided public source URL with person-name affinity"
-          : "Found directly on provided public source URL",
-      };
-    })
+    .filter((email) => hasNameAffinity(email, name))
+    .map((email) => ({
+      email,
+      confidence: 0.98,
+      reason: "Found directly on provided public source URL with person-name affinity",
+    }))
     .sort((a, b) => b.confidence - a.confidence || a.email.localeCompare(b.email));
 }
 
@@ -216,6 +211,18 @@ export async function orchestrate(userId: string, rawInput: unknown): Promise<Em
           sources_checked: hintHarvest.sources_checked,
           found_public_emails: hintHarvest.emails,
         },
+      };
+    }
+    if (input.real_only && hintHarvest.emails.length) {
+      return {
+        status: "not_found",
+        candidates: [],
+        evidence: {
+          ...unknownEvidence(),
+          sources_checked: hintHarvest.sources_checked,
+          found_public_emails: hintHarvest.emails,
+        },
+        next_best_action: "Public source emails were found, but none matched the requested person strongly enough.",
       };
     }
 
