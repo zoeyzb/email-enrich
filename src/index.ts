@@ -1,7 +1,7 @@
 import { ENRICH_CONFIG, GENERIC_LOCAL_PARTS } from "./constants";
 import { domainEmailsCache, domainPatternCache } from "./cache";
 import { resolveCompanyDomain } from "./domain";
-import { harvestPublicEmails } from "./harvest";
+import { harvestPublicEmails, harvestPublicSourceUrls } from "./harvest";
 import { inferEmailPattern } from "./patterns";
 import { parsePersonName } from "./name_parser";
 import { generateEmailCandidates } from "./candidates";
@@ -140,6 +140,23 @@ function mergeRealCandidates(domain: string, name: ParsedName, ...emailLists: st
   ).values());
 }
 
+function sourceHintCandidates(emails: string[], name: ParsedName) {
+  const unique = Array.from(new Set(emails.map((email) => email.toLowerCase()).filter(Boolean)));
+  return unique
+    .map((email) => {
+      const nameMatched = hasNameAffinity(email, name);
+      const confidence = nameMatched ? 0.98 : unique.length <= 3 ? 0.9 : 0.75;
+      return {
+        email,
+        confidence,
+        reason: nameMatched
+          ? "Found directly on provided public source URL with person-name affinity"
+          : "Found directly on provided public source URL",
+      };
+    })
+    .sort((a, b) => b.confidence - a.confidence || a.email.localeCompare(b.email));
+}
+
 function emptyResearchSignals(): ResearchSignals {
   return {
     people_pages: [],
@@ -177,13 +194,42 @@ export async function orchestrate(userId: string, rawInput: unknown): Promise<Em
     }
     emailEnrichRateLimiter.recordUsage(userId, ip);
 
+    const parsedName = parsePersonName(input.person_name);
+    const sourceUrls = Array.from(new Set((input.hints?.source_urls ?? []).filter(Boolean))).slice(0, 12);
+    const hintHarvest = sourceUrls.length
+      ? await harvestPublicSourceUrls({ source_urls: sourceUrls })
+      : { emails: [] as string[], sources_checked: [] as string[], pages_fetched: 0 };
+    const hintedCandidates = sourceHintCandidates(hintHarvest.emails, parsedName);
+
+    // Public profile URLs are a first-class source. This path intentionally
+    // works without a company domain so a no-website business can still return
+    // a real email published on a bar, court, directory, or docket page.
+    if (hintedCandidates.length) {
+      const best = hintedCandidates[0]!;
+      return {
+        status: "ok",
+        best_email: best.email,
+        confidence: best.confidence,
+        candidates: hintedCandidates.slice(0, 12),
+        evidence: {
+          ...unknownEvidence(),
+          sources_checked: hintHarvest.sources_checked,
+          found_public_emails: hintHarvest.emails,
+        },
+      };
+    }
+
     const domainResolution = await resolveCompanyDomain(input);
     if (!domainResolution) {
       return {
         status: "needs_user_input",
         candidates: [],
-        evidence: unknownEvidence(),
-        next_best_action: "Please provide the company domain or website URL.",
+        evidence: {
+          ...unknownEvidence(),
+          sources_checked: hintHarvest.sources_checked,
+          found_public_emails: hintHarvest.emails,
+        },
+        next_best_action: "No email was found on the supplied public sources. Provide a company domain or another public profile URL.",
       };
     }
 
@@ -233,8 +279,6 @@ export async function orchestrate(userId: string, rawInput: unknown): Promise<Em
         arxivUrls: researchSignals.arxiv_urls,
         signalEmails: researchSignals.signal_emails,
       });
-
-    const parsedName = parsePersonName(input.person_name);
 
     // Always prioritize real/harvested emails for cold outreach scenarios,
     // but only those attributable to the requested person by name.
