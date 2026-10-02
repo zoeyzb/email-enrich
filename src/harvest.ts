@@ -354,7 +354,77 @@ export async function harvestPublicEmails(input: { domain: string; mode: EnrichM
   }
 }
 
+
+function isSafePublicSourceUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return false;
+    const host = url.hostname.toLowerCase().replace(/\.$/, "");
+    if (!host || host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local")) return false;
+    if (host === "::1" || host === "0.0.0.0") return false;
+    const ipv4 = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+    if (ipv4) {
+      const parts = ipv4.slice(1).map(Number);
+      if (parts.some((part) => part < 0 || part > 255)) return false;
+      const [a, b] = parts;
+      if (
+        a === 10 ||
+        a === 127 ||
+        a === 0 ||
+        (a === 169 && b === 254) ||
+        (a === 172 && b >= 16 && b <= 31) ||
+        (a === 192 && b === 168)
+      ) return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Harvest exact public source URLs supplied by the caller. Unlike company-domain
+ * harvesting, this works for bar, court, directory, docket, or other public
+ * profiles even when the target business intentionally has no website.
+ */
+export async function harvestPublicSourceUrls(input: { source_urls: string[] }): Promise<HarvestResult> {
+  try {
+    const urls = Array.from(new Set(
+      (input.source_urls ?? [])
+        .map((value) => String(value || "").trim())
+        .filter((value) => value && isSafePublicSourceUrl(value))
+    )).slice(0, 12);
+
+    if (!urls.length) {
+      return { emails: [], sources_checked: [], pages_fetched: 0 };
+    }
+
+    const fetched = await runWithConcurrency(urls, 4, async (url) => fetchText(url));
+    const emails = new Set<string>();
+    const sourcesChecked: string[] = [];
+    let pagesFetched = 0;
+
+    for (const item of fetched) {
+      if (!item?.content) continue;
+      pagesFetched += 1;
+      sourcesChecked.push(item.url);
+      for (const email of extractEmailsFromHtml(item.content)) {
+        emails.add(email.toLowerCase());
+      }
+    }
+
+    return {
+      emails: Array.from(emails),
+      sources_checked: Array.from(new Set(sourcesChecked)),
+      pages_fetched: pagesFetched,
+    };
+  } catch {
+    return { emails: [], sources_checked: [], pages_fetched: 0 };
+  }
+}
+
 export const __private__ = {
   deobfuscate,
   extractEmailsFromHtml,
+  isSafePublicSourceUrl,
 };
