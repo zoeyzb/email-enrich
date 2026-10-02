@@ -421,4 +421,4 @@ export async function orchestrate(userId: string, rawInput: unknown): Promise<Em
 
 export * from "./types";
 
-export { harvestPublicEmails } from "./harvest";
+export { harvestPublicEmails, harvestPublicSourceUrls } from "./harvest";
