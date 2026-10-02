@@ -9,15 +9,19 @@ const makeResponse = (url: string, html: string) => ({
 });
 
 describe("public source URL hints", () => {
+  const originalFetch = global.fetch;
+
   afterEach(() => {
+    global.fetch = originalFetch;
     jest.restoreAllMocks();
   });
 
   test("harvests published emails from exact safe public source URLs", async () => {
-    const fetchMock = jest.spyOn(global, "fetch" as never).mockImplementation((async (input: RequestInfo | URL) => {
+    const fetchMock = jest.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
       return makeResponse(url, "<html><body>Jane Doe — jane.doe@gmail.com</body></html>") as unknown as Response;
-    }) as typeof fetch);
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
 
     const result = await harvestPublicSourceUrls({
       source_urls: [
@@ -32,13 +36,14 @@ describe("public source URL hints", () => {
   });
 
   test("returns a real hinted email without requiring a company website or domain", async () => {
-    jest.spyOn(global, "fetch" as never).mockImplementation((async (input: RequestInfo | URL) => {
+    const fetchMock = jest.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
       return makeResponse(
         url,
         "<html><body><h1>Jane Doe</h1><p>Email: jane.doe@gmail.com</p></body></html>"
       ) as unknown as Response;
-    }) as typeof fetch);
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
 
     const result = await orchestrate("law-pipeline-source-hint-test", {
       person_name: "Jane Doe",
